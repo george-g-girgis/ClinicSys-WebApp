@@ -16,7 +16,7 @@ A full-featured **Clinic Management System** web application built with **Flask*
 
 ```bash
 # 1. Clone the repo
-git clone <your-repo-url>
+git clone https://github.com/george-g-girgis/ClinicSys-WebApp
 cd ClinicSys-WebApp
 
 # 2. Create virtual environment
