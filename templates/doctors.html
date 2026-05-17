@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ t('doctors_directory') }}</h2>
+    <div>
+        <a href="{{ url_for('export_csv', table_name='Doctors') }}" class="btn btn-outline-secondary fw-bold me-2">{{ t('export_csv')|upper }}</a>
+        <button class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addDoctorModal">{{ t('add_doctor')|upper }}</button>
+    </div>
+</div>
+
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="q" class="form-control me-2" placeholder="{{ t('search_doctors_hint') }}" value="{{ request.args.get('q', '') }}">
+    <button class="btn btn-primary fw-bold" type="submit">{{ t('search_btn') }}</button>
+</form>
+
+<div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4 py-3" style="width: 80px;">{{ t('id') }}</th>
+                    <th>{{ t('doctor_name') }}</th>
+                    <th>{{ t('specialty') }}</th>
+                    <th>{{ t('phone') }}</th>
+                    <th class="pe-4 text-end">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in doctors %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ row.ID }}</td>
+                    <td>{{ row.Name }}</td>
+                    <td><span class="badge bg-secondary">{{ row.Specialty or t('unspecified') }}</span></td>
+                    <td>{{ row.PhoneNumber or '-' }}</td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-primary shadow-none" 
+                                onclick='editDoctor({{ row.ID }}, `{{ row.Name }}`, `{{ row.Specialty or "" }}`, `{{ row.PhoneNumber or "" }}`)'>{{ t('edit') }}</button>
+                        
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('delete_doctor').format(id=row.ID) }}');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none">{{ t('delete') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center py-5 text-muted">{{ t('no_doctors') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Doctor Modal -->
+<div class="modal fade" id="addDoctorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="add">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">{{ t('new_doctor_profile') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('doctor_name') }} *</label>
+                    <input type="text" name="name" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('specialty') }}</label>
+                    <select name="specialty" class="form-select bg-light" id="add_specialty" onchange="toggleAddSpecOther()">
+                        <option value="">None</option>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Neurology">Neurology</option>
+                        <option value="Pediatrics">Pediatrics</option>
+                        <option value="Orthopedics">Orthopedics</option>
+                        <option value="Psychiatry">Psychiatry</option>
+                        <option value="Other...">Other...</option>
+                    </select>
+                    <input type="text" name="specialty_other" id="add_specialty_other" class="form-control bg-light mt-2 d-none" placeholder="{{ t('other') }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('phone') }}</label>
+                    <input type="text" name="phone" class="form-control bg-light" pattern="\d{11}" minlength="11" maxlength="11" title="Phone number must be exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-success fw-bold px-4">{{ t('save_doctor') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Doctor Modal -->
+<div class="modal fade" id="editDoctorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">{{ t('update_doctor_profile') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('doctor_name') }} *</label>
+                    <input type="text" name="name" id="edit_name" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('specialty') }}</label>
+                    <select name="specialty" id="edit_specialty" class="form-select bg-light" onchange="toggleEditSpecOther()">
+                        <option value="">None</option>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Neurology">Neurology</option>
+                        <option value="Pediatrics">Pediatrics</option>
+                        <option value="Orthopedics">Orthopedics</option>
+                        <option value="Psychiatry">Psychiatry</option>
+                        <option value="Other...">Other...</option>
+                    </select>
+                    <input type="text" name="specialty_other" id="edit_specialty_other" class="form-control bg-light mt-2 d-none" placeholder="{{ t('other') }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('phone') }}</label>
+                    <input type="text" name="phone" id="edit_phone" class="form-control bg-light" pattern="\d{11}" minlength="11" maxlength="11" title="Phone number must be exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4">{{ t('save_changes') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleAddSpecOther() {
+    let sel = document.getElementById('add_specialty');
+    let other = document.getElementById('add_specialty_other');
+    if (sel.value === 'Other...') {
+        other.classList.remove('d-none');
+        other.required = true;
+    } else {
+        other.classList.add('d-none');
+        other.required = false;
+    }
+}
+
+function toggleEditSpecOther() {
+    let sel = document.getElementById('edit_specialty');
+    let other = document.getElementById('edit_specialty_other');
+    if (sel.value === 'Other...') {
+        other.classList.remove('d-none');
+        other.required = true;
+    } else {
+        other.classList.add('d-none');
+        other.required = false;
+    }
+}
+
+function editDoctor(id, name, specialty, phone) {
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_name').value = name;
+    
+    let sel = document.getElementById('edit_specialty');
+    let other = document.getElementById('edit_specialty_other');
+    
+    let options = Array.from(sel.options).map(o => o.value);
+    if (options.includes(specialty) || !specialty) {
+        sel.value = specialty || '';
+        other.classList.add('d-none');
+        other.required = false;
+    } else {
+        sel.value = 'Other...';
+        other.value = specialty;
+        other.classList.remove('d-none');
+        other.required = true;
+    }
+    
+    document.getElementById('edit_phone').value = phone;
+    
+    new bootstrap.Modal(document.getElementById('editDoctorModal')).show();
+}
+</script>
+{% endblock %}

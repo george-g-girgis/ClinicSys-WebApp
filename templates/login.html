@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block login_content %}
+<div class="row justify-content-center pt-5">
+    <div class="col-md-5">
+        <div class="card shadow rounded-4 border-0">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold mb-1">⚕️ ClinicSys Web</h2>
+                    <p class="text-muted">Sign in to your account</p>
+                </div>
+                
+                <form method="POST" action="{{ url_for('login') }}">
+                    <div class="mb-4">
+                        <label class="form-label text-muted fw-semibold">Username</label>
+                        <input type="text" name="username" class="form-control form-control-lg bg-light" placeholder="Enter username" required autofocus>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted fw-semibold">Password</label>
+                        <input type="password" name="password" class="form-control form-control-lg bg-light" placeholder="Enter password" required>
+                    </div>
+                    
+                    <div class="d-grid mt-5">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold rounded-3">LOGIN</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ t('user_management') }}</h2>
+    <div>
+        <a href="{{ url_for('export_csv', table_name='Admin_Users') }}" class="btn btn-outline-secondary fw-bold me-2">{{ t('export_csv')|upper }}</a>
+        <button class="btn btn-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">{{ t('add_user')|upper }}</button>
+    </div>
+</div>
+
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="q" class="form-control me-2" placeholder="{{ t('search_users_hint') }}" value="{{ request.args.get('q', '') }}">
+    <button class="btn btn-dark fw-bold" type="submit">{{ t('search_btn') }}</button>
+</form>
+
+<div class="alert alert-info">
+    <small><strong>{{ t('security_note_strong') }}</strong> {{ t('security_note_text') }}</small>
+</div>
+
+<div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4 py-3" style="width: 80px;">{{ t('id') }}</th>
+                    <th>{{ t('username') }}</th>
+                    <th>{{ t('role') }}</th>
+                    <th class="pe-4 text-end">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in users %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ row.ID }}</td>
+                    <td class="fw-bold">{{ row.Username }}</td>
+                    <td>
+                        <span class="badge {% if row.Role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {{ row.Role|upper }}
+                        </span>
+                    </td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-primary shadow-none" 
+                                onclick='editUser({{ row.ID }}, `{{ row.Username }}`, `{{ row.Role }}`)'>{{ t('edit') }}</button>
+                        
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('delete_user').format(id=row.ID) }}');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none">{{ t('delete') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center py-5 text-muted">{{ t('no_users') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="add">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">{{ t('create_new_user') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('username') }} *</label>
+                    <input type="text" name="username" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('password') }} *</label>
+                    <input type="password" name="password" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('system_role') }}</label>
+                    <select name="role" class="form-select bg-light">
+                        <option value="admin">{{ t('admin') }}</option>
+                        <option value="staff" selected>{{ t('staff') }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-dark fw-bold px-4">{{ t('create_user') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">{{ t('update_user_roles') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('username') }} *</label>
+                    <input type="text" name="username" id="edit_username" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('password') }}</label>
+                    <input type="password" name="password" id="edit_password" class="form-control bg-light" placeholder="{{ t('pw_blank_hint') }}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('system_role') }}</label>
+                    <select name="role" id="edit_role" class="form-select bg-light">
+                        <option value="admin">{{ t('admin') }}</option>
+                        <option value="staff">{{ t('staff') }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4">{{ t('save_changes') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editUser(id, username, role) {
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_password').value = ""; // Always clear on open
+    document.getElementById('edit_role').value = role;
+    
+    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+}
+</script>
+{% endblock %}

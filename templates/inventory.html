@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ t('inventory_hub') }}</h2>
+    <div>
+        <a href="{{ url_for('export_csv', table_name='Inventory') }}" class="btn btn-outline-secondary fw-bold me-2">{{ t('export_csv')|upper }}</a>
+        <button class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addItemModal">{{ t('add_item')|upper }}</button>
+    </div>
+</div>
+
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="q" class="form-control me-2" placeholder="{{ t('search_inventory_hint') }}" value="{{ request.args.get('q', '') }}">
+    <button class="btn btn-primary fw-bold" type="submit">{{ t('search_btn') }}</button>
+</form>
+
+<div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4 py-3" style="width: 80px;">{{ t('id') }}</th>
+                    <th>{{ t('item_name') }}</th>
+                    <th>Price</th>
+                    <th>{{ t('quantity') }}</th>
+                    <th>{{ t('expiry_date') }}</th>
+                    <th class="pe-4 text-end">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in inventory %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ row.ID }}</td>
+                    <td>{{ row.ItemName }}</td>
+                    <td class="fw-bold text-success">${{ '{:,.2f}'.format(row.Price or 0) }}</td>
+                    <td>
+                        <span class="badge {% if row.Quantity < 10 %}bg-danger{% else %}bg-success{% endif %}">
+                            {{ row.Quantity }}
+                        </span>
+                    </td>
+                    <td>{{ row.ExpiryDate or '-' }}</td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-primary shadow-none" 
+                                onclick='editItem({{ row.ID }}, `{{ row.ItemName }}`, {{ row.Price or 0 }}, {{ row.Quantity }}, `{{ row.ExpiryDate or "" }}`)'>{{ t('edit') }}</button>
+                        
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('delete_item').format(id=row.ID) }}');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none">{{ t('delete') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center py-5 text-muted">{{ t('no_items') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="add">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">{{ t('new_inventory_item') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-8">
+                    <label class="form-label text-muted fw-bold">{{ t('item_name') }} *</label>
+                    <select name="item_name_select" id="add_item_name_select" class="form-select bg-light" required onchange="toggleAddOther()">
+                        <option value="">Choose...</option>
+                        <option value="Syringe">Syringe</option>
+                        <option value="Bandage">Bandage</option>
+                        <option value="Paracetamol">Paracetamol</option>
+                        <option value="Amoxicillin">Amoxicillin</option>
+                        <option value="Ibuprofen">Ibuprofen</option>
+                        <option value="Gauze">Gauze</option>
+                        <option value="Saline Solution">Saline Solution</option>
+                        <option value="Other">Other...</option>
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label class="form-label text-muted fw-bold">Price *</label>
+                    <input type="number" step="0.01" name="price" class="form-control bg-light" value="0.00" required>
+                </div>
+                <div class="col-12" id="add_item_other_div" style="display: none;">
+                    <input type="text" name="item_name_other" id="add_item_name_other" class="form-control bg-light" placeholder="Type custom item name...">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('quantity') }} *</label>
+                    <input type="number" name="quantity" class="form-control bg-light" value="0" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('expiry_date') }}</label>
+                    <input type="date" name="expiry_date" class="form-control bg-light">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-success fw-bold px-4">{{ t('add_item') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">{{ t('update_item') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-8">
+                    <label class="form-label text-muted fw-bold">{{ t('item_name') }} *</label>
+                    <select name="item_name_select" id="edit_item_name_select" class="form-select bg-light" required onchange="toggleEditOther()">
+                        <option value="">Choose...</option>
+                        <option value="Syringe">Syringe</option>
+                        <option value="Bandage">Bandage</option>
+                        <option value="Paracetamol">Paracetamol</option>
+                        <option value="Amoxicillin">Amoxicillin</option>
+                        <option value="Ibuprofen">Ibuprofen</option>
+                        <option value="Gauze">Gauze</option>
+                        <option value="Saline Solution">Saline Solution</option>
+                        <option value="Other">Other...</option>
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label class="form-label text-muted fw-bold">Price *</label>
+                    <input type="number" step="0.01" name="price" id="edit_price" class="form-control bg-light" required>
+                </div>
+                <div class="col-12" id="edit_item_other_div" style="display: none;">
+                    <input type="text" name="item_name_other" id="edit_item_name_other" class="form-control bg-light" placeholder="Type custom item name...">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('quantity') }} *</label>
+                    <input type="number" name="quantity" id="edit_quantity" class="form-control bg-light" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('expiry_date') }}</label>
+                    <input type="date" name="expiry_date" id="edit_expiry_date" class="form-control bg-light">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4">{{ t('save_changes') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleAddOther() {
+    let sel = document.getElementById('add_item_name_select');
+    let div = document.getElementById('add_item_other_div');
+    div.style.display = (sel.value === 'Other') ? 'block' : 'none';
+}
+
+function toggleEditOther() {
+    let sel = document.getElementById('edit_item_name_select');
+    let div = document.getElementById('edit_item_other_div');
+    div.style.display = (sel.value === 'Other') ? 'block' : 'none';
+}
+
+function editItem(id, name, price, qty, expiry) {
+    document.getElementById('edit_id').value = id;
+    
+    let sel = document.getElementById('edit_item_name_select');
+    let predef = ["Syringe", "Bandage", "Paracetamol", "Amoxicillin", "Ibuprofen", "Gauze", "Saline Solution"];
+    
+    if (predef.includes(name)) {
+        sel.value = name;
+        document.getElementById('edit_item_name_other').value = "";
+    } else {
+        sel.value = "Other";
+        document.getElementById('edit_item_name_other').value = name;
+    }
+    toggleEditOther();
+
+    document.getElementById('edit_price').value = parseFloat(price).toFixed(2);
+    document.getElementById('edit_quantity').value = qty;
+    document.getElementById('edit_expiry_date').value = expiry;
+    
+    new bootstrap.Modal(document.getElementById('editItemModal')).show();
+}
+</script>
+{% endblock %}

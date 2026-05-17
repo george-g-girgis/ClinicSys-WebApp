@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ t('billing_payments') }}</h2>
+    <div>
+        <a href="{{ url_for('export_csv', table_name='Billing') }}" class="btn btn-outline-secondary fw-bold me-2">{{ t('export_csv')|upper }}</a>
+        <button class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addBillModal">{{ t('add_bill')|upper }}</button>
+    </div>
+</div>
+
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="q" class="form-control me-2" placeholder="{{ t('search_billing_hint') }}" value="{{ request.args.get('q', '') }}">
+    <button class="btn btn-primary fw-bold" type="submit">{{ t('search_btn') }}</button>
+</form>
+
+<div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4 py-3" style="width: 80px;">{{ t('id') }}</th>
+                    <th>{{ t('patient_name') }}</th>
+                    <th>{{ t('amount_usd') }}</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>{{ t('date') }}</th>
+                    <th>{{ t('status') }}</th>
+                    <th class="pe-4 text-end">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in bills %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ row.ID }}</td>
+                    <td>{{ row.FullName }}</td>
+                    <td class="fw-bold text-primary">${{ "%.2f"|format(row.Amount) }}</td>
+                    <td class="fw-semibold text-secondary">{{ row.ItemName or '-' }}</td>
+                    <td>
+                        {% if row.Item_Qty %}
+                            <span class="badge bg-secondary">{{ row.Item_Qty }}</span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ row.Date }}</td>
+                    <td>
+                        <form method="POST" class="m-0">
+                            <input type="hidden" name="action" value="update_status">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <select name="status" class="form-select form-select-sm shadow-none {% if row.Status == 'Paid' %}bg-success text-white border-success{% else %}bg-warning text-dark border-warning{% endif %}" onchange="this.form.submit()" style="cursor: pointer; font-weight: bold;">
+                                <option value="Pending" {% if row.Status == 'Pending' %}selected{% endif %}>{{ t('status_pending') }}</option>
+                                <option value="Paid" {% if row.Status == 'Paid' %}selected{% endif %}>{{ t('status_paid') }}</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-primary shadow-none" 
+                                onclick='editBill({{ row.ID }}, {{ row.Patient_ID }}, {{ row.Amount }}, `{{ row.Date }}`, `{{ row.Status }}`)'>{{ t('edit') }}</button>
+                        
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('delete_bill').format(id=row.ID) }}');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none">{{ t('delete') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center py-5 text-muted">{{ t('no_bills') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Bill Modal -->
+<div class="modal fade" id="addBillModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="add">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">{{ t('create_new_bill') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('patient') }} *</label>
+                    <select name="patient_id" class="form-select bg-light" required>
+                        <option value="">{{ t('select_pt') }}</option>
+                        {% for pt in patients %}
+                        <option value="{{ pt.ID }}">{{ pt.FullName }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('amount_usd') }} *</label>
+                    <input type="number" step="0.01" name="amount" class="form-control bg-light" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('date') }} *</label>
+                    <input type="datetime-local" name="date" class="form-control bg-light" value="{{ now_dt }}" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">Inventory Item</label>
+                    <select name="item_id" class="form-select bg-light">
+                        <option value="">None</option>
+                        {% for item in inventory_items %}
+                        <option value="{{ item['ID'] }}">{{ item['ItemName'] }} (Stock: {{ item['Quantity'] }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">Item Quantity</label>
+                    <input type="number" name="item_qty" class="form-control bg-light" placeholder="0" min="0">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('status') }}</label>
+                    <select name="status" class="form-select bg-light">
+                        <option value="Pending">{{ t('status_pending') }}</option>
+                        <option value="Paid">{{ t('status_paid') }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-success fw-bold px-4">{{ t('create_bill') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Bill Modal -->
+<div class="modal fade" id="editBillModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">{{ t('update_bill_status') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('patient') }} *</label>
+                    <select name="patient_id" id="edit_patient_id" class="form-select bg-light" required>
+                        {% for pt in patients %}
+                        <option value="{{ pt.ID }}">{{ pt.FullName }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('amount_usd') }} *</label>
+                    <input type="number" step="0.01" name="amount" id="edit_amount" class="form-control bg-light" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted fw-bold">{{ t('date') }} *</label>
+                    <input type="datetime-local" name="date" id="edit_date" class="form-control bg-light" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('status') }}</label>
+                    <select name="status" id="edit_status" class="form-select bg-light">
+                        <option value="Pending">{{ t('status_pending') }}</option>
+                        <option value="Paid">{{ t('status_paid') }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4">{{ t('save_changes') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editBill(id, patient_id, amount, date, status) {
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_patient_id').value = patient_id;
+    document.getElementById('edit_amount').value = amount;
+    document.getElementById('edit_date').value = date;
+    document.getElementById('edit_status').value = status;
+    
+    new bootstrap.Modal(document.getElementById('editBillModal')).show();
+}
+</script>
+{% endblock %}

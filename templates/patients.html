@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ t('patients_db') }}</h2>
+    <div>
+        <a href="{{ url_for('export_csv', table_name='Patients') }}" class="btn btn-outline-secondary fw-bold me-2">{{ t('export_csv')|upper }}</a>
+        <button class="btn btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#addPatientModal">{{ t('add_patient')|upper }}</button>
+    </div>
+</div>
+
+<form method="GET" class="d-flex mb-3">
+    <input type="text" name="q" class="form-control me-2" placeholder="{{ t('search_patients_hint') }}" value="{{ request.args.get('q', '') }}">
+    <button class="btn btn-primary fw-bold" type="submit">{{ t('search_btn') }}</button>
+</form>
+
+<div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-4 py-3">{{ t('id') }}</th>
+                    <th>{{ t('full_name') }}</th>
+                    <th>{{ t('age') }}</th>
+                    <th>{{ t('phone') }}</th>
+                    <th>{{ t('medical_history') }}</th>
+                    <th>{{ t('allergies') }}</th>
+                    <th>{{ t('next_appointment') }}</th>
+                    <th class="pe-4 text-end">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in patients %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ row.ID }}</td>
+                    <td>{{ row.FullName }}</td>
+                    <td>{{ row.Age or '-' }}</td>
+                    <td>{{ row.PhoneNumber or '-' }}</td>
+                    <td>{{ row.MedicalHistory or '-' }}</td>
+                    <td>{{ row.Allergies or '-' }}</td>
+                    <td>{{ row.NextAppointment or '-' }}</td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-outline-primary shadow-none" 
+                                onclick='editPatient({{ row.ID }}, `{{ row.FullName|replace("`", "") }}`, `{{ row.DOB or "" }}`, `{{ row.PhoneNumber or "" }}`, `{{ row.MedicalHistory|replace("`", "") }}`, `{{ row.Allergies|replace("`", "") }}`, `{{ row.NextAppointment or "" }}`)'>{{ t('edit') }}</button>
+                        
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('delete_patient').format(id=row.ID) }}');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="{{ row.ID }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none">{{ t('delete') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center py-5 text-muted">{{ t('no_patients') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Patient Modal -->
+<div class="modal fade" id="addPatientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="add">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">{{ t('new_patient_reg') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-md-8">
+                    <label class="form-label text-muted fw-bold">{{ t('full_name') }} *</label>
+                    <input type="text" name="full_name" class="form-control bg-light" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted fw-bold">{{ t('birth_date') }}</label>
+                    <input type="date" name="dob" class="form-control bg-light">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted fw-bold">{{ t('phone') }}</label>
+                    <input type="text" name="phone" class="form-control bg-light" pattern="\d{11}" minlength="11" maxlength="11" title="Phone number must be exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted fw-bold">{{ t('next_appointment') }}</label>
+                    <input type="date" name="next_appt" class="form-control bg-light">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('medical_history') }}</label>
+                    <textarea name="history" class="form-control bg-light" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('allergies') }}</label>
+                    <select name="allergies" class="form-select bg-light" id="add_allergies" onchange="toggleAddOther()">
+                        <option value="None">None</option>
+                        <option value="Penicillin">Penicillin</option>
+                        <option value="Pollen">Pollen</option>
+                        <option value="Dust">Dust</option>
+                        <option value="Other...">Other...</option>
+                    </select>
+                    <input type="text" name="allergies_other" id="add_allergies_other" class="form-control bg-light mt-2 d-none" placeholder="{{ t('other') }}">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-success fw-bold px-4">{{ t('register_patient') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Patient Modal -->
+<div class="modal fade" id="editPatientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">{{ t('update_patient_record') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 row g-3">
+                <div class="col-md-8">
+                    <label class="form-label text-muted fw-bold">{{ t('full_name') }} *</label>
+                    <input type="text" name="full_name" id="edit_full_name" class="form-control bg-light" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted fw-bold">{{ t('birth_date') }}</label>
+                    <input type="date" name="dob" id="edit_dob" class="form-control bg-light">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted fw-bold">{{ t('phone') }}</label>
+                    <input type="text" name="phone" id="edit_phone" class="form-control bg-light" pattern="\d{11}" minlength="11" maxlength="11" title="Phone number must be exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted fw-bold">{{ t('next_appointment') }}</label>
+                    <input type="date" name="next_appt" id="edit_next_appt" class="form-control bg-light">
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('medical_history') }}</label>
+                    <textarea name="history" id="edit_history" class="form-control bg-light" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted fw-bold">{{ t('allergies') }}</label>
+                    <select name="allergies" id="edit_allergies" class="form-select bg-light" onchange="toggleEditOther()">
+                        <option value="None">None</option>
+                        <option value="Penicillin">Penicillin</option>
+                        <option value="Pollen">Pollen</option>
+                        <option value="Dust">Dust</option>
+                        <option value="Other...">Other...</option>
+                    </select>
+                    <input type="text" name="allergies_other" id="edit_allergies_other" class="form-control bg-light mt-2 d-none" placeholder="{{ t('other') }}">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4">{{ t('save_changes') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleAddOther() {
+    let sel = document.getElementById('add_allergies');
+    let other = document.getElementById('add_allergies_other');
+    if (sel.value === 'Other...') {
+        other.classList.remove('d-none');
+        other.required = true;
+    } else {
+        other.classList.add('d-none');
+        other.required = false;
+    }
+}
+
+function toggleEditOther() {
+    let sel = document.getElementById('edit_allergies');
+    let other = document.getElementById('edit_allergies_other');
+    if (sel.value === 'Other...') {
+        other.classList.remove('d-none');
+        other.required = true;
+    } else {
+        other.classList.add('d-none');
+        other.required = false;
+    }
+}
+
+function editPatient(id, name, dob, phone, history, allergies, next_appt) {
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_full_name').value = name;
+    document.getElementById('edit_dob').value = dob;
+    document.getElementById('edit_phone').value = phone;
+    document.getElementById('edit_history').value = history;
+    
+    let sel = document.getElementById('edit_allergies');
+    let other = document.getElementById('edit_allergies_other');
+    
+    // Check if the allergy is standard
+    let options = Array.from(sel.options).map(o => o.value);
+    if (options.includes(allergies) || !allergies) {
+        sel.value = allergies || 'None';
+        other.classList.add('d-none');
+        other.required = false;
+    } else {
+        sel.value = 'Other...';
+        other.value = allergies;
+        other.classList.remove('d-none');
+        other.required = true;
+    }
+    
+    document.getElementById('edit_next_appt').value = next_appt;
+    
+    new bootstrap.Modal(document.getElementById('editPatientModal')).show();
+}
+</script>
+{% endblock %}
